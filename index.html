@@ -242,7 +242,7 @@
   <div class="bar">
     <nav class="tabs" id="days" aria-label="Conference days"></nav>
     <div class="tools">
-      <input id="q" type="search" aria-label="Search talks, people, and rooms" placeholder="Search talks, people, rooms…" autocomplete="off">
+      <input id="q" type="search" aria-label="Search talks, people, affiliations, and rooms" placeholder="Search talks, people, affiliations…" autocomplete="off">
       <button id="starOnly" type="button" aria-pressed="false" title="Show starred only">★</button>
       <button id="viewToggle" type="button" aria-pressed="false">List</button>
       <button id="largeText" type="button" aria-pressed="false" title="Larger text">Aa</button>
@@ -1082,7 +1082,7 @@ function buildRows() {
           room: s.room || "", colour: kindColour(s.kind), ti: s.title, ctx: "", au: "", af: "", nd: true,
           hay: norm([s.title, s.room || "", (s.chairs || []).join(" ")].join(" ")) });
       } else {
-        rows.push({ di, key: "s" + s.id, sessionRow: true, when: fmtRange(s.start, s.end), start: toMin(s.start), end: toMin(s.end), room: s.room || "", colour: kindColour(s.kind), ti: s.title, ctx: "", au: "", af: "", hay: norm([s.title, s.room || "", (s.chairs || []).join(" ")].join(" ")) });
+        rows.push({ di, key: "s" + s.id, sessionRow: true, when: fmtRange(s.start, s.end), start: toMin(s.start), end: toMin(s.end), room: s.room || "", colour: kindColour(s.kind), ti: s.title, ctx: "", au: "", af: "", hay: norm([s.title, s.room || "", (s.chairs || []).join(" "), s.talks.flatMap(t => t.a.map(a => [a[0], a[1] || ""].join(" "))).join(" ")].join(" ")) });
         s.talks.forEach((t, i) => {
           const slot = talkSlot(s, i);
           rows.push({ di, key: "t" + (t.n != null ? t.n : s.id + "_" + i), when: slotLabel(slot),
@@ -1090,7 +1090,7 @@ function buildRows() {
             ti: t.t, ctx: norm(t.t) === norm(s.title) ? "" : s.title,
             au: t.a.map(a => a[2] ? `<b>${esc(a[0])}</b>` : esc(a[0])).join(", "),
             af: [...new Set(t.a.filter(a => a[1]).map(a => a[1]))].join("; "),
-            hay: norm([t.t, s.title, s.room || "", t.a.map(a => a[0]).join(" ")].join(" ")) });
+            hay: norm([t.t, s.title, s.room || "", t.a.map(a => [a[0], a[1] || ""].join(" ")).join(" ")].join(" ")) });
         });
       }
     });
