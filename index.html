@@ -68,6 +68,7 @@
     height: calc(100vh - var(--barH, 96px));
     height: calc(100dvh - var(--barH, 96px));
     overflow: auto; -webkit-overflow-scrolling: touch; margin: 0 -14px;
+    scroll-snap-type: x proximity; scroll-padding-left: 48px;
   }
   .gtable { display: grid; position: relative; min-width: 100%; width: max-content; }
   .room-jump:not([hidden]) { display: flex; align-items: center; gap: 8px; padding-top: 6px; }
@@ -89,7 +90,7 @@
   }
   .gut span { position: absolute; right: 4px; transform: translateY(-50%); }
   .hourline { position: absolute; left: 0; right: 0; border-top: 1px solid var(--line); pointer-events: none; }
-  .gcol { position: relative; border-left: 1px solid var(--line); }
+  .gcol { position: relative; border-left: 1px solid var(--line); scroll-snap-align: start; }
   .mealband {
     position: absolute; left: 0; right: 0; background: #fbf1e8; border-radius: 8px;
   }
@@ -1522,6 +1523,13 @@ $("largeText").addEventListener("click", () => {
   render();
 });
 
+function scrollToCurrentTime(now) {
+  const grid = document.querySelector(".gwrap");
+  if (!grid || !now || confDayIndex(now.date) !== curDay) return;
+  const start = Math.min(...DATA.days[curDay].sessions.map(s => toMin(s.start)));
+  grid.scrollTop = Math.max(0, (now.minutes - start) * PXMIN - 48);
+}
+
 (function init() {
   if (lsGet("issotl26-large") === "1") {
     document.body.classList.add("large");
@@ -1533,6 +1541,7 @@ $("largeText").addEventListener("click", () => {
   if (now && confDayIndex(now.date) >= 0) curDay = confDayIndex(now.date);
   else curDay = Math.min(Math.max(+(lsGet("issotl26-day") || 0), 0), CONF_DAYS - 1);
   render();
+  scrollToCurrentTime(now);
   if (history.state && history.state.d) openDetail(history.state.d, false);
   setInterval(() => {
     const n = nowInRegina();
