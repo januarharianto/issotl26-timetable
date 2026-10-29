@@ -96,6 +96,7 @@
   .mealband {
     position: absolute; left: 0; right: 0; background: #fbf1e8; border-radius: 8px;
   }
+  .sharedband { position: absolute; left: 0; right: 0; background: #f3f4f6; padding: 4px 6px; overflow: hidden; font-size: 11px; color: #374151; pointer-events: none; }
   .block[data-kind="meal"] { background: transparent; }
   .block {
     position: absolute; left: 2px; right: 2px; overflow: hidden; background: #fff;
@@ -1175,13 +1176,11 @@ function renderGrid() {
   const now = nowInRegina();
   const isToday = now && confDayIndex(now.date) === curDay;
 
-  const rooms = [];
-  const colOf = {};
-  day.sessions.forEach((s) => {
-    const r = s.room || "Program";
-    if (!(r in colOf)) { colOf[r] = rooms.length; rooms.push(r); }
+  const roomOrder = ["Salon A,B,C,D", "Salon E", "Blair Nelson", "Gallery A", "Gallery B", "Gallery C", "Gallery D", "Gallery Suite I", "Centennial Room A", "Registration & Check-in"];
+  const rooms = [...new Set(day.sessions.filter(s => s.room).map(s => s.room))].sort((a, b) => {
+    const rank = room => roomOrder.includes(room) ? roomOrder.indexOf(room) : roomOrder.length;
+    return rank(a) - rank(b) || a.localeCompare(b);
   });
-  // order columns by first appearance time, then keep no-room sessions in their slot order
   const dayMin = Math.min(...day.sessions.map(s => toMin(s.start)));
   const dayMax = Math.max(...day.sessions.map(s => toMin(s.end)));
   const y = (m) => (m - dayMin) * PXMIN;
@@ -1203,6 +1202,9 @@ function renderGrid() {
   const bandHtml = bands.map(b =>
     `<div class="mealband" style="top:${y(b[0])}px;height:${(b[1] - b[0]) * PXMIN}px"></div>`).join("");
 
+  const sharedHtml = day.sessions.filter(s => !s.room).map(s =>
+    `<div class="sharedband" style="top:${y(toMin(s.start))}px;height:${(toMin(s.end) - toMin(s.start)) * PXMIN}px"><strong>${esc(fmtRange(s.start, s.end))}</strong><br>${esc(s.title)}</div>`).join("");
+
   let hours = "", hourLines = "";
   for (let m = Math.ceil(dayMin / 60) * 60; m <= dayMax; m += 60) {
     hours += `<span style="top:${y(m)}px">${fmtTime(String(Math.floor(m / 60)).padStart(2, "0") + ":00")}</span>`;
@@ -1212,7 +1214,7 @@ function renderGrid() {
   let cols = "";
   rooms.forEach((room, ci) => {
     let blocks = "";
-    day.sessions.filter(s => (s.room || "Program") === room).forEach((s) => {
+    day.sessions.filter(s => s.room === room).forEach((s) => {
       const st = toMin(s.start), en = toMin(s.end);
       const top = y(st), h = Math.max((en - st) * PXMIN - 2, 44);
       const colour = kindColour(s.kind);
@@ -1253,7 +1255,8 @@ function renderGrid() {
       const fits = Math.max(0, Math.floor((h - 64) / 14));
       const shown = s.talks.slice(0, fits);
       const allFit = s.kind !== "roundtable" && n > 0 && shown.length === n;
-      const talkLines = n === 0 ? ""
+      const singleWorkshop = s.kind === "workshop" && n === 1;
+      const talkLines = singleWorkshop ? `<div class="tk">${esc(s.title)}</div>` : n === 0 ? ""
         : allFit
           ? shown.map(t => `<div class="tk"${t.n != null ? ` data-tk="t${t.n}"` : ""}>${esc(t.t)}</div>`).join("")
           : `<div class="tk" style="font-weight:700">${n} ${noun} · tap to view</div>`;
@@ -1263,12 +1266,12 @@ function renderGrid() {
         style="top:${top}px;height:${h}px">
         ${eventHeader(fmtRange(s.start, s.end), "s" + s.id, s.title, hasEnded(curDay, en, now))}
         ${n > 0 ? `<button type="button" class="open-item" aria-label="${esc(sessAria2)}">` : ""}
-        <div class="bt" style="color:${colour}">${esc(s.title)}</div>
+        <div class="bt" style="color:${colour}">${esc(singleWorkshop ? s.talks[0].t : s.title)}</div>
         ${talkLines}
         ${n > 0 ? "</button>" : ""}
       </div>`;
     });
-    cols += `<div class="gcol" style="height:${gridH}px">${hourLines}${bandHtml}${blocks}</div>`;
+    cols += `<div class="gcol" style="height:${gridH}px">${hourLines}${bandHtml}${sharedHtml}${blocks}</div>`;
   });
 
   const head = `<div class="gcorner"></div>` +
