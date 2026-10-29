@@ -1288,7 +1288,10 @@ function renderGrid() {
     saveStars();
     render();
   }));
-  $("main").querySelectorAll(".sesslabel, .block .open-item").forEach(b => {
+  $("main").querySelectorAll(".block:not(.inert)").forEach(card => {
+    card.addEventListener("click", () => openDetail(card.dataset.key, true));
+  });
+  $("main").querySelectorAll(".sesslabel").forEach(b => {
     b.addEventListener("click", () => openDetail(b.closest("[data-key]").dataset.key, true));
     b.addEventListener("keydown", (e) => {
       if (b.tagName !== "BUTTON" && e.target === b && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openDetail(b.dataset.key, true); }
