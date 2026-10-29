@@ -132,6 +132,8 @@
   .block, .row, .dt-talk { cursor: pointer; }
   .block.inert, .row.inert { cursor: default; }
   .block .star.on { color: var(--ink); }
+  .block.up-next { outline: 1px solid #15803d; outline-offset: -1px; background: #f0fdf4; }
+  .up-next-label { color: #166534; font-weight: 700; margin-left: 4px; }
   .block.live { background: var(--redsoft); border-radius: 4px; }
   .block.live .bt::after { content: " ●"; color: var(--red); }
   .nowbar {
@@ -1235,7 +1237,7 @@ function renderGrid() {
           const ended = hasEnded(curDay, slot.end, now);
           const aria = `${slotLabel(slot)}${s.room ? ", " + s.room : ""}. Talk in ${s.title}: ${t.t}. By ${t.a.map(a => a[0]).join(", ")}.`;
           const key = "t" + (t.n != null ? t.n : s.id + "_" + i);
-          blocks += `<div class="block talkblk${talkLive ? " live" : ""}${ended ? " ended" : ""}" data-key="${key}"
+          blocks += `<div class="block talkblk${talkLive ? " live" : ""}${ended ? " ended" : ""}" data-key="${key}" data-start="${slot.start}"
             style="top:${talkTop}px;height:${talkHeight}px">
             ${eventHeader(slotLabel(slot), key, t.t, ended)}
             <button class="open-item" type="button" aria-label="${esc(aria)}">
@@ -1257,7 +1259,7 @@ function renderGrid() {
           : `<div class="tk" style="font-weight:700">${n} ${noun} · tap to view</div>`;
       const sessAria2 = `${fmtRange(s.start, s.end)}${s.room ? ", " + s.room : ""}. ${KINDNAMES[s.kind] || "Session"}: ${s.title}.` +
         (n > 0 ? ` ${n} ${noun}.` : "") + (live ? " Happening now." : "");
-      blocks += `<div class="block${live ? " live" : ""}${hasEnded(curDay, en, now) ? " ended" : ""}${n === 0 ? " inert" : ""}" data-key="s${s.id}" data-kind="${s.kind}"
+      blocks += `<div class="block${live ? " live" : ""}${hasEnded(curDay, en, now) ? " ended" : ""}${n === 0 ? " inert" : ""}" data-key="s${s.id}" data-kind="${s.kind}" data-start="${st}"
         style="top:${top}px;height:${h}px">
         ${eventHeader(fmtRange(s.start, s.end), "s" + s.id, s.title, hasEnded(curDay, en, now))}
         ${n > 0 ? `<button type="button" class="open-item" aria-label="${esc(sessAria2)}">` : ""}
@@ -1280,6 +1282,19 @@ function renderGrid() {
       ${nowM !== null && nowM >= dayMin && nowM <= dayMax
         ? `<div class="nowbar" style="top:${y(nowM)}px"><span class="nlabel">NOW ${nowLabel}</span></div>` : ""}
     </div></div>`;
+
+  if (nowM !== null) {
+    $("main").querySelectorAll(".gcol").forEach(col => {
+      const future = [...col.querySelectorAll(".block")].filter(card => Number(card.dataset.start) > nowM);
+      const nextStart = Math.min(...future.map(card => Number(card.dataset.start)));
+      future.filter(card => Number(card.dataset.start) === nextStart).forEach(card => {
+        card.classList.add("up-next");
+        card.querySelector(".event-time").insertAdjacentHTML("beforeend", '<span class="up-next-label">Up next</span>');
+        const button = card.querySelector(".open-item");
+        if (button) button.setAttribute("aria-label", "Up next. " + button.getAttribute("aria-label"));
+      });
+    });
+  }
 
   $("main").querySelectorAll(".block .star").forEach(b => b.addEventListener("click", (e) => {
     e.stopPropagation();
