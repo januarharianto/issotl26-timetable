@@ -17,6 +17,13 @@
     font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   }
   .wrap { max-width: none; margin: 0 auto; padding: 0 14px calc(24px + env(safe-area-inset-bottom)); }
+  body.calendar { height: 100vh; height: 100dvh; overflow: hidden; }
+  .calendar .wrap { height: 100%; display: flex; flex-direction: column; padding-bottom: env(safe-area-inset-bottom); }
+  .calendar .wrap > :not(main) { flex-shrink: 0; }
+  .calendar .bar { position: relative; }
+  .calendar #main { flex: 1; min-height: 0; }
+  .calendar .gwrap { height: 100%; }
+  #storageWarning:empty { display: none; }
   h1 { font-size: 17px; margin: 14px 14px 2px; }
   .sub { font-size: 12px; color: var(--muted); margin: 0 14px 8px; }
   .bar {
@@ -63,18 +70,21 @@
     overflow: auto; -webkit-overflow-scrolling: touch; margin: 0 -14px;
   }
   .gtable { display: grid; position: relative; min-width: 100%; width: max-content; }
+  .room-jump:not([hidden]) { display: flex; align-items: center; gap: 8px; padding-top: 6px; }
+  .room-jump label { font-size: 12px; font-weight: 600; }
+  #roomSelect { flex: 1; min-width: 0; min-height: 36px; font: inherit; color: var(--ink); background: #fff; border: 1px solid #aaa; border-radius: 6px; }
   .gcorner {
-    position: sticky; top: 0; left: 0; z-index: 7; background: var(--headbg);
+    position: sticky; top: 0; left: 0; z-index: 9; background: var(--headbg);
     border-bottom: 1px solid var(--line); border-right: 1px solid var(--line);
   }
   .chead {
-    position: sticky; top: 0; z-index: 5; background: var(--headbg); font-size: 11.5px; font-weight: 700;
-    color: var(--muted); text-align: center; padding: 6px 3px 5px; border-bottom: 1px solid var(--line);
-    border-left: 1px solid var(--line); text-transform: uppercase; letter-spacing: .3px;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    position: sticky; top: 0; z-index: 8; background: var(--headbg); font-size: 13px; font-weight: 700;
+    color: var(--ink); text-align: center; padding: 8px 6px; border-bottom: 1px solid #aaa;
+    border-left: 1px solid var(--line); line-height: 1.3; min-height: 44px;
+    white-space: normal; overflow-wrap: anywhere;
   }
   .gut {
-    position: sticky; left: 0; z-index: 4; background: var(--headbg); border-right: 1px solid var(--line);
+    position: sticky; left: 0; z-index: 7; background: var(--headbg); border-right: 1px solid var(--line);
     color: var(--muted); font-size: 10.5px; text-align: right;
   }
   .gut span { position: absolute; right: 4px; transform: translateY(-50%); }
@@ -235,6 +245,10 @@
       <button id="starOnly" type="button" aria-pressed="false" title="Show starred only">★</button>
       <button id="viewToggle" type="button" aria-pressed="false">List</button>
       <button id="largeText" type="button" aria-pressed="false" title="Larger text">Aa</button>
+    </div>
+    <div class="room-jump" id="roomJump" hidden>
+      <label for="roomSelect">Jump to room</label>
+      <select id="roomSelect"></select>
     </div>
   </div>
 
@@ -1248,7 +1262,7 @@ function renderGrid() {
   const colsTemplate = `48px repeat(${rooms.length}, minmax(252px, 1fr))`;
 
   $("main").innerHTML = `
-    <div class="gwrap"><div class="gtable" style="grid-template-columns:${colsTemplate}">
+    <div class="gwrap" tabindex="0" role="region" aria-label="Calendar: scroll horizontally for rooms and vertically for times"><div class="gtable" style="grid-template-columns:${colsTemplate}">
       ${head}${gutter}${cols}
       ${nowM !== null && nowM >= dayMin && nowM <= dayMax
         ? `<div class="nowbar" style="top:${y(nowM)}px"><span class="nlabel">NOW ${nowLabel}</span></div>` : ""}
@@ -1327,13 +1341,24 @@ function render() {
   const grid = document.querySelector(".gwrap");
   const scroll = grid && [grid.scrollLeft, grid.scrollTop];
   const pageY = window.scrollY;
+  const calendar = !query && !starOnly && !listView;
+  document.body.classList.toggle("calendar", calendar);
   renderTabs();
-  if (query || starOnly || listView) renderList(); else renderGrid();
+  if (calendar) renderGrid(); else renderList();
+  $("roomJump").hidden = !calendar;
+  if (calendar) {
+    $("roomSelect").innerHTML = '<option value="">Choose a room…</option>' +
+      [...document.querySelectorAll(".chead")].map((head, i) =>
+        `<option value="${i}">${esc(head.textContent)}</option>`).join("");
+  }
   $("viewToggle").textContent = listView ? "Grid" : "List";
   $("viewToggle").setAttribute("aria-pressed", String(listView));
   measureBar();
   const nextGrid = document.querySelector(".gwrap");
-  if (nextGrid && scroll) { nextGrid.scrollLeft = scroll[0]; nextGrid.scrollTop = scroll[1]; }
+  if (nextGrid && scroll) {
+    nextGrid.scrollLeft = scroll[0]; nextGrid.scrollTop = scroll[1];
+    if (active === grid && !$("detail").open) nextGrid.focus({ preventScroll: true });
+  }
   if (day !== undefined) $("days").querySelector(`[data-i="${day}"]`)?.focus({ preventScroll: true });
   else if (key && !$("detail").open) {
     const match = [...$("main").querySelectorAll("[data-key]")].find(el => el.dataset.key === key);
@@ -1343,6 +1368,16 @@ function render() {
   window.scrollTo({ top: pageY });
 }
 window.addEventListener("resize", measureBar);
+$("roomSelect").addEventListener("change", (e) => {
+  if (e.target.value === "") return;
+  const grid = document.querySelector(".gwrap");
+  const head = document.querySelectorAll(".chead")[Number(e.target.value)];
+  if (grid && head) {
+    const gutter = document.querySelector(".gut").offsetWidth;
+    grid.scrollLeft = head.offsetLeft - gutter;
+  }
+  e.target.value = "";
+});
 
 /* ---------- detail overlay ---------- */
 function talkDetail({ t, s, di }) {
