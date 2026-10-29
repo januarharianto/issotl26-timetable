@@ -143,14 +143,17 @@
     padding: 1px 6px; border-radius: 4px; line-height: 1.5;
   }
 
-  /* compact header in landscape / short windows */
-  @media (max-height: 500px) {
-    h1 { margin: 6px 14px 1px; font-size: 15px; }
-    .sub { margin-bottom: 4px; }
-    .todayline { margin-bottom: 4px; }
-    .tabs button { padding: 4px 2px; font-size: 12.5px; }
-    .tools { padding-top: 4px; }
-    #q, #starOnly { padding: 4px 8px; }
+  /* Keep calendar controls visible without spending landscape space on the masthead. */
+  @media (orientation: landscape) and (max-height: 500px) {
+    .wrap > h1 { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+    .wrap > .sub { display: none; }
+    #todayLine { display: none !important; }
+    .bar { padding: 2px 6px 4px; }
+    .tabs button { padding: 3px 2px; font-size: 12.5px; min-height: 28px; }
+    .tabs button.today::after { display: none; }
+    .tools { padding-top: 2px; gap: 6px; }
+    #q, #starOnly, #viewToggle, #layoutToggle, #largeText { padding: 4px 8px; min-height: 30px; }
+    .chead { padding: 4px 6px; min-height: 30px; }
   }
 
   /* ---- flat results list (search / starred) ---- */
