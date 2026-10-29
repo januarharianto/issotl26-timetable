@@ -146,6 +146,9 @@
     letter-spacing: .4px; margin: 18px 10px 2px;
   }
   .row { padding: 8px 10px 9px; border-bottom: 1px solid var(--line); }
+  .block.ended, .row.ended { background: repeating-linear-gradient(135deg, #f5f5f5 0 6px, #fafafa 6px 12px); }
+  .ended-label { font-size: 10px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+  .result-day { font-size: 16px; margin: 20px 10px 4px; scroll-margin-top: calc(var(--barH, 96px) + 12px); }
   .row.live { border-left: 3px solid var(--red); padding-left: 7px; background: var(--redsoft); }
   .l1 { font-size: 12px; color: var(--muted); display: flex; align-items: baseline; }
   .l1 .rm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-left: 6px; }
@@ -1052,7 +1055,7 @@ function talkSlot(s, i) {
 }
 const minTime = m => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 const slotLabel = slot => `${fmtRange(minTime(slot.start), minTime(slot.end))}${slot.estimated ? " (estimated)" : ""}`;
-const eventHeader = (time, key, title) => `<div class="event-header"><div class="event-time">${esc(time)}</div><button class="star${isStarred(key) ? " on" : ""}" type="button" aria-pressed="${isStarred(key)}" aria-label="${isStarred(key) ? "Unstar" : "Star"}: ${esc(title)}">${isStarred(key) ? "★" : "☆"}</button></div>`;
+const eventHeader = (time, key, title, ended = false) => `<div class="event-header"><div class="event-time">${esc(time)}</div>${ended ? '<span class="ended-label">Ended</span>' : ""}<button class="star${isStarred(key) ? " on" : ""}" type="button" aria-pressed="${isStarred(key)}" aria-label="${isStarred(key) ? "Unstar" : "Star"}: ${esc(title)}">${isStarred(key) ? "★" : "☆"}</button></div>`;
 
 /* flat rows (search / starred results) */
 function buildRows() {
@@ -1101,6 +1104,11 @@ const rowVisible = (r) => {
   return query.split(/\s+/).every(w => r.hay.includes(w));
 };
 
+const resultRows = () => ROWS.filter(r => (query || r.di === curDay) && rowVisible(r))
+  .sort((a, b) => a.di - b.di || a.start - b.start);
+const hasEnded = (di, end, now) => Boolean(now && (DATA.days[di].date < now.date ||
+  (DATA.days[di].date === now.date && end <= now.minutes)));
+
 const FULLDAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 
 function renderTabs() {
@@ -1118,7 +1126,7 @@ function renderTabs() {
     const dt = new Date(Date.parse(d.date + "T12:00:00Z"));
     let cnt = 0;
     if (query || starOnly) ROWS.forEach(r => { if (r.di === i && rowVisible(r)) cnt++; });
-    return `<button class="${i === curDay ? "on" : ""}${i === todayIdx ? " today" : ""}" data-i="${i}" type="button" aria-pressed="${i === curDay}">
+    return `<button class="${!query && i === curDay ? "on" : ""}${i === todayIdx ? " today" : ""}" data-i="${i}" type="button" aria-pressed="${!query && i === curDay}">
       ${DAYNAMES[dt.getUTCDay()]} ${dt.getUTCDate()}<span class="cnt${cnt ? " show" : ""}">${cnt}</span>
     </button>`;
   }).join("");
@@ -1126,7 +1134,9 @@ function renderTabs() {
     curDay = +b.dataset.i;
     lsSet("issotl26-day", String(curDay));
     render();
-    window.scrollTo({ top: 0 });
+    const group = query && document.getElementById("results-day-" + curDay);
+    if (group) { group.focus({ preventScroll: true }); group.scrollIntoView({ block: "start" }); }
+    else window.scrollTo({ top: 0 });
   }));
 }
 
@@ -1195,11 +1205,12 @@ function renderGrid() {
           const lineHeight = document.body.classList.contains("large") ? 16.25 : 13.75;
           const titleLines = Math.max(1, Math.floor((talkHeight - 31 - (showAu ? 18 : 0)) / lineHeight));
           const talkLive = isToday && nowM !== null && nowM >= slot.start && nowM < slot.end;
+          const ended = hasEnded(curDay, slot.end, now);
           const aria = `${slotLabel(slot)}${s.room ? ", " + s.room : ""}. Talk in ${s.title}: ${t.t}. By ${t.a.map(a => a[0]).join(", ")}.`;
           const key = "t" + (t.n != null ? t.n : s.id + "_" + i);
-          blocks += `<div class="block talkblk${talkLive ? " live" : ""}" data-key="${key}"
+          blocks += `<div class="block talkblk${talkLive ? " live" : ""}${ended ? " ended" : ""}" data-key="${key}"
             style="top:${talkTop}px;height:${talkHeight}px">
-            ${eventHeader(slotLabel(slot), key, t.t)}
+            ${eventHeader(slotLabel(slot), key, t.t, ended)}
             <button class="open-item" type="button" aria-label="${esc(aria)}">
               <div class="bt" style="color:${colour};--title-lines:${titleLines}">${esc(t.t)}</div>
               ${showAu ? `<div class="tk">${esc(t.a.map(a => a[0]).join(", "))}</div>` : ""}
@@ -1219,9 +1230,9 @@ function renderGrid() {
           : `<div class="tk" style="font-weight:700">${n} ${noun} · tap to open</div>`;
       const sessAria2 = `${fmtRange(s.start, s.end)}${s.room ? ", " + s.room : ""}. ${KINDNAMES[s.kind] || "Session"}: ${s.title}.` +
         (n > 0 ? ` ${n} ${noun}.` : "") + (live ? " Happening now." : "");
-      blocks += `<div class="block${live ? " live" : ""}${n === 0 ? " inert" : ""}" data-key="s${s.id}" data-kind="${s.kind}"
+      blocks += `<div class="block${live ? " live" : ""}${hasEnded(curDay, en, now) ? " ended" : ""}${n === 0 ? " inert" : ""}" data-key="s${s.id}" data-kind="${s.kind}"
         style="top:${top}px;height:${h}px">
-        ${eventHeader(fmtRange(s.start, s.end), "s" + s.id, s.title)}
+        ${eventHeader(fmtRange(s.start, s.end), "s" + s.id, s.title, hasEnded(curDay, en, now))}
         ${n > 0 ? `<button type="button" class="open-item" aria-label="${esc(sessAria2)}">` : ""}
         <div class="bt" style="color:${colour}">${esc(s.title)}</div>
         ${talkLines}
@@ -1265,20 +1276,24 @@ function renderGrid() {
 /* ---------- flat results list ---------- */
 function renderList() {
   const now = nowInRegina();
-  const isToday = now && confDayIndex(now.date) === curDay;
-  const dayRows = ROWS.filter(r => r.di === curDay && rowVisible(r));
+  const dayRows = resultRows();
   if (!dayRows.length) {
     $("main").innerHTML = `<div class="empty">${starOnly && !query
       ? "No starred items on this day — tap ☆ on any entry."
-      : "No matches on this day."}</div>`;
+      : query ? "No matches across all days." : "No matches on this day."}</div>`;
     return;
   }
-  let html = "", lastSlot = "";
+  let html = query ? '<p class="sub" role="status">Search results across all four days</p>' : "", lastSlot = "", lastDay = -1;
   for (const r of dayRows) {
+    if (query && r.di !== lastDay) {
+      html += `<h2 class="result-day" id="results-day-${r.di}" tabindex="-1">${dayLabel(r.di)}</h2>`;
+      lastDay = r.di; lastSlot = "";
+    }
     if (r.when !== lastSlot) { html += `<h3 class="lt">${r.when}</h3>`; lastSlot = r.when; }
-    const live = isToday && now.minutes >= r.start && now.minutes < r.end;
-    html += `<div class="row${live ? " live" : ""}${r.nd ? " inert" : ""}" data-key="${esc(r.key)}">
-      <div class="l1"><span>${r.when}</span><span class="rm">${esc(r.room)}</span>
+    const live = now && DATA.days[r.di].date === now.date && now.minutes >= r.start && now.minutes < r.end;
+    const ended = hasEnded(r.di, r.end, now);
+    html += `<div class="row${live ? " live" : ""}${ended ? " ended" : ""}${r.nd ? " inert" : ""}" data-key="${esc(r.key)}">
+      <div class="l1"><span>${r.when}${ended ? ' · <span class="ended-label">Ended</span>' : ""}</span><span class="rm">${esc(r.room)}</span>
         <button class="star${isStarred(r.key) ? " on" : ""}" type="button" aria-pressed="${isStarred(r.key)}" aria-label="${isStarred(r.key) ? "Unstar" : "Star"}: ${esc(r.ti)}">${isStarred(r.key) ? "★" : "☆"}</button></div>
       ${r.nd ? `<div class="ti" style="color:${r.colour}">${esc(r.ti)}</div>` : `<button class="open-item ti" type="button" style="color:${r.colour}">${esc(r.ti)}</button>`}
       ${r.ctx ? `<div class="ctx">in ${esc(r.ctx)}</div>` : ""}
